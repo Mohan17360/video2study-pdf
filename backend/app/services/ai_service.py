@@ -11,35 +11,38 @@ class AISummarizationService:
             self._initialize_model()
 
     def _initialize_model(self):
-        # Prefer the latest active models
-        preferred_models = [
-            "gemini-3.6-flash",
+        # Priority list starting with gemini-3.5-flash
+        models_to_try = [
             "gemini-3.5-flash",
+            "gemini-3.6-flash",
             "gemini-3-flash",
-            "gemini-1.5-flash",
-            "gemini-1.5-pro"
+            "gemini-1.5-flash"
         ]
         
-        for name in preferred_models:
+        for name in models_to_try:
             try:
                 self.model = genai.GenerativeModel(name)
-                # Quick test ping to make sure the model is actually active
-                print(f"[AI Service] Connected to model: {name}")
+                print(f"[AI Service] Initialized active Gemini model: {name}")
                 return
             except Exception:
                 continue
 
-        # Dynamic fallback if none of the above succeeded
+        # Dynamic fallback if none of the above are matched directly
         try:
             available = [
                 m.name.replace("models/", "") for m in genai.list_models()
                 if "generateContent" in m.supported_generation_methods and "2.5" not in m.name
             ]
+            for m in available:
+                if "3.5" in m or "flash" in m:
+                    self.model = genai.GenerativeModel(m)
+                    print(f"[AI Service] Fallback connected to: {m}")
+                    return
             if available:
                 self.model = genai.GenerativeModel(available[0])
                 print(f"[AI Service] Fallback connected to: {available[0]}")
         except Exception as err:
-            print(f"[AI Service] Model initialization warning: {err}")
+            print(f"[AI Service] Model detection note: {err}")
 
     def generate_study_structure(self, metadata: dict, transcript: str, options: OptionsPayload) -> StudySummaryDocument:
         if not self.model:
@@ -50,37 +53,40 @@ class AISummarizationService:
         is_fallback = "[NO_CAPTIONS_FALLBACK]" in transcript
         context_label = "VIDEO OUTLINE & TOPICS (Captions disabled)" if is_fallback else "TRANSCRIPT"
 
+        # Cap transcript tokens to keep inference fast
+        cleaned_transcript = transcript[:25000]
+
         prompt = f"""You are an expert academic curriculum designer.
-Convert this lecture information into an original, concise, and structured study guide.
-Faithful to lecture facts. Do not invent unverified details.
+Synthesize this lecture into an original, concise, and structured study guide.
+Focus strictly on lecture facts. Keep descriptions informative yet punchy for fast study.
 Summary Depth: {options.depth}. Target Language: {options.language}.
 
 TITLE: {metadata['title']}
 CHANNEL: {metadata['channel']}
 
 {context_label}:
-{transcript[:30000]}
+{cleaned_transcript}
 
-Respond ONLY with valid JSON conforming to this schema:
+Respond ONLY with valid JSON matching this schema:
 {{
   "video_id": "{metadata.get('video_id', '')}",
   "video_title": "{metadata['title']}",
   "channel_name": "{metadata['channel']}",
-  "introduction": "Introductory scope and summary",
-  "learning_objectives": ["Objective 1", "Objective 2"],
+  "introduction": "Introductory scope and lecture overview",
+  "learning_objectives": ["Objective 1", "Objective 2", "Objective 3"],
   "sections": [
     {{
       "section_id": "sec_1",
       "title": "Module Title",
-      "summary_markdown": "Clear academic explanation",
-      "key_points": ["Key Point 1", "Key Point 2"],
-      "definitions": [{{"term": "Term", "definition": "Explanation"}}],
+      "summary_markdown": "Concise high-yield explanation",
+      "key_points": ["Key point 1", "Key point 2"],
+      "definitions": [{{"term": "Key Term", "definition": "Direct definition"}}],
       "formulas_or_steps": ["Step 1 or Formula"],
       "requires_visual": true,
-      "visual_search_query": "Specific diagram or schematic topic"
+      "visual_search_query": "Specific technical diagram query"
     }}
   ],
-  "quick_revision": ["Revision check 1", "Revision check 2"],
+  "quick_revision": ["Exam revision point 1", "Exam revision point 2"],
   "key_takeaways": ["Takeaway 1", "Takeaway 2"]
 }}
 """

@@ -9,17 +9,19 @@ class VisualSearchService:
         self.headers = {"User-Agent": settings.COMMONS_API_USER_AGENT}
         if settings.GEMINI_API_KEY:
             genai.configure(api_key=settings.GEMINI_API_KEY)
-            self.ai_model = genai.GenerativeModel("gemini-3.6-flash")
+            for m in ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-3-flash", "gemini-1.5-flash"]:
+                try:
+                    self.ai_model = genai.GenerativeModel(m)
+                    break
+                except Exception:
+                    continue
         else:
             self.ai_model = None
 
     def resolve_visual(self, concept_query: str, section_title: str, section_summary: str) -> VisualAsset:
-        # 1. Try Wikimedia Commons with strict relevance verification
         commons_asset = self._search_wikimedia_verified(concept_query)
         if commons_asset:
             return commons_asset
-
-        # 2. If no verified diagram exists online, generate a concept-specific SVG diagram with Gemini
         return self._generate_custom_diagram(concept_query, section_title, section_summary)
 
     def _search_wikimedia_verified(self, concept_query: str) -> VisualAsset:
@@ -37,7 +39,7 @@ class VisualSearchService:
                     "iiprop": "url|extmetadata|size"
                 },
                 headers=self.headers,
-                timeout=4
+                timeout=3
             ).json()
 
             pages = resp.get("query", {}).get("pages", {})
@@ -47,8 +49,6 @@ class VisualSearchService:
                 title = page.get("title", "").lower()
                 imageinfo = page.get("imageinfo", [{}])[0]
                 img_url = imageinfo.get("url", "")
-                
-                # Verify that key tokens appear in the image title (rejects random photos)
                 matches = sum(1 for kw in query_keywords if kw in title)
                 if matches >= max(1, len(query_keywords) // 2):
                     if img_url.endswith((".png", ".jpg", ".jpeg", ".svg")):
@@ -64,33 +64,26 @@ class VisualSearchService:
                             license=license_name,
                             is_generated_svg=False
                         )
-        except Exception as e:
-            print(f"[Visual Search] Wikimedia error: {e}")
+        except Exception:
+            pass
         return None
 
     def _generate_custom_diagram(self, concept_query: str, section_title: str, section_summary: str) -> VisualAsset:
-        """
-        Asks Gemini to generate an educational, concept-accurate SVG schematic
-        specifically for this section's content.
-        """
         if self.ai_model:
             try:
-                prompt = f"""You are an educational graphic illustrator and technical diagram designer.
-Create a clean, beautiful, visually informative SVG diagram that specifically illustrates this concept:
+                prompt = f"""Create a clean, beautiful educational SVG diagram illustrating this concept:
 CONCEPT: {concept_query}
 SECTION: {section_title}
-CONTEXT: {section_summary[:350]}
+CONTEXT: {section_summary[:300]}
 
-REQUIREMENTS:
-1. Return ONLY the raw valid <svg viewBox="0 0 650 260" xmlns="http://www.w3.org/2000/svg" width="100%" height="260"> ... </svg> code.
-2. Use modern colors: backgrounds #f8fafc, borders #94a3b8, cards #ffffff, primary elements #2563eb, accents #10b981 or #f59e0b, dark text #0f172a.
-3. Draw actual components, arrows, labeled boxes, or flow steps matching the concept (e.g. if TCP handshake: show Client/Server SYN->SYN-ACK->ACK; if OSI: show stacked layers; if biology: show inputs/outputs/cycles).
-4. Include clear text labels explaining each step or part.
-5. Do not wrap in markdown quotes (no ```xml or ```svg). Output only the raw <svg> tag.
+RULES:
+1. Return ONLY the raw <svg viewBox="0 0 650 240" xmlns="http://www.w3.org/2000/svg" width="100%" height="240"> ... </svg>.
+2. Clean modern styling: background #f8fafc, primary cards #ffffff, border #94a3b8, highlight #2563eb, dark text #0f172a.
+3. Draw actual components, arrows, labeled boxes matching the steps or architecture.
+4. No markdown block wraps (no ```xml or ```svg). Output raw <svg> only.
 """
                 res = self.ai_model.generate_content(prompt)
                 svg_code = res.text.strip()
-                # Clean any markdown code blocks if the model included them
                 if svg_code.startswith("```"):
                     svg_code = re.sub(r"^```[a-zA-Z]*\n", "", svg_code)
                     svg_code = re.sub(r"\n```$", "", svg_code)
@@ -100,29 +93,25 @@ REQUIREMENTS:
                         target_concept=concept_query,
                         image_url="",
                         source_url="AI Generated Schematic",
-                        attribution="Video2Study Educational Diagram Engine",
+                        attribution="Video2Study Engine",
                         license="Original Educational Diagram",
                         is_generated_svg=True,
                         svg_code=svg_code
                     )
-            except Exception as e:
-                print(f"[Diagram Engine] AI SVG generation error: {e}")
+            except Exception:
+                pass
 
-        # Fallback neatly styled card if AI generation was unreachable
-        fallback_svg = f"""<svg viewBox="0 0 600 160" width="100%" height="160" xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)">
-          <rect width="600" height="160" fill="#f1f5f9" stroke="#cbd5e1" rx="8"/>
-          <text x="300" y="32" font-family="-apple-system, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" fill="#1e293b">CONCEPT: {concept_query.upper()[:45]}</text>
-          <rect x="40" y="55" width="150" height="75" fill="#ffffff" stroke="#2563eb" stroke-width="1.5" rx="6"/>
-          <text x="115" y="88" font-family="-apple-system, sans-serif" font-size="11" font-weight="600" text-anchor="middle" fill="#1e40af">{section_title[:20]}</text>
-          <text x="115" y="106" font-family="-apple-system, sans-serif" font-size="9" text-anchor="middle" fill="#64748b">Primary Input</text>
-          <path d="M 195 92 L 235 92" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)"/>
-          <rect x="240" y="55" width="150" height="75" fill="#ffffff" stroke="#10b981" stroke-width="1.5" rx="6"/>
-          <text x="315" y="88" font-family="-apple-system, sans-serif" font-size="11" font-weight="600" text-anchor="middle" fill="#065f46">Operation / Rules</text>
-          <text x="315" y="106" font-family="-apple-system, sans-serif" font-size="9" text-anchor="middle" fill="#64748b">Core Processing</text>
-          <path d="M 395 92 L 435 92" stroke="#10b981" stroke-width="2"/>
-          <rect x="440" y="55" width="120" height="75" fill="#ffffff" stroke="#6366f1" stroke-width="1.5" rx="6"/>
-          <text x="500" y="88" font-family="-apple-system, sans-serif" font-size="11" font-weight="600" text-anchor="middle" fill="#3730a3">Target State</text>
-          <text x="500" y="106" font-family="-apple-system, sans-serif" font-size="9" text-anchor="middle" fill="#64748b">Verified Output</text>
+        fallback_svg = f"""<svg viewBox="0 0 600 150" width="100%" height="150" xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)">
+          <rect width="600" height="150" fill="#f8fafc" stroke="#cbd5e1" rx="8"/>
+          <text x="300" y="30" font-family="-apple-system, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" fill="#1e293b">{concept_query.upper()[:45]}</text>
+          <rect x="50" y="55" width="140" height="70" fill="#ffffff" stroke="#2563eb" stroke-width="1.5" rx="6"/>
+          <text x="120" y="90" font-family="-apple-system, sans-serif" font-size="11" font-weight="600" text-anchor="middle" fill="#1e40af">{section_title[:18]}</text>
+          <path d="M 195 90 L 235 90" stroke="#2563eb" stroke-width="2"/>
+          <rect x="240" y="55" width="140" height="70" fill="#ffffff" stroke="#10b981" stroke-width="1.5" rx="6"/>
+          <text x="310" y="90" font-family="-apple-system, sans-serif" font-size="11" font-weight="600" text-anchor="middle" fill="#065f46">Operation Rules</text>
+          <path d="M 385 90 L 425 90" stroke="#10b981" stroke-width="2"/>
+          <rect x="430" y="55" width="120" height="70" fill="#ffffff" stroke="#6366f1" stroke-width="1.5" rx="6"/>
+          <text x="490" y="90" font-family="-apple-system, sans-serif" font-size="11" font-weight="600" text-anchor="middle" fill="#3730a3">Target State</text>
         </svg>"""
         return VisualAsset(
             target_concept=concept_query,
