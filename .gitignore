@@ -1,0 +1,25 @@
+# Secrets & Environments
+.env
+backend/.env
+venv/
+backend/venv/
+ENV/
+env/
+
+# Generated Files
+storage/
+backend/storage/*.pdf
+*.pdf
+
+# Python Cache
+__pycache__/
+*/__pycache__/
+*.py[cod]
+*.class
+
+# OS / Editor files
+.vscode/
+.DS_Store
+Thumbs.db
+fix_template.py
+build_project.py

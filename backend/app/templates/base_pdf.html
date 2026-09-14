@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>{{ doc.video_title }}</title>
+  <style>
+    @page { size: A4; margin: 18mm 14mm 18mm 14mm; @bottom-right { content: counter(page); font-size: 8pt; color: #94a3b8; } }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #0f172a; line-height: 1.55; font-size: 10pt; }
+    .page-break { page-break-before: always; }
+    .cover { height: 85vh; display: flex; flex-direction: column; justify-content: center; border-left: 6px solid #2563eb; padding-left: 26px; }
+    .title { font-size: 24pt; font-weight: 800; margin: 8px 0; line-height: 1.25; }
+    .meta { color: #64748b; font-size: 11pt; margin-bottom: 4px; }
+    .thumb-wrapper { margin-top: 20px; max-width: 480px; }
+    .thumb-wrapper img { width: 100%; border-radius: 8px; border: 1px solid #cbd5e1; box-shadow: 0 4px 6px rgba(0,0,0,0.06); }
+    h2 { color: #1e40af; border-bottom: 1.5px solid #dbeafe; padding-bottom: 4px; margin-top: 24px; font-size: 13.5pt; }
+    .box { background: #f8fafc; border-left: 3.5px solid #3b82f6; padding: 8px 12px; margin: 10px 0; border-radius: 0 4px 4px 0; font-size: 9.5pt; }
+    .visual { text-align: center; margin: 16px 0; background: #ffffff; padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; page-break-inside: avoid; }
+    .visual img { max-width: 90%; max-height: 250px; object-fit: contain; }
+    .caption { font-size: 8pt; color: #64748b; margin-top: 6px; font-weight: 500; }
+    table { width: 100%; border-collapse: collapse; font-size: 8.5pt; margin-top: 14px; }
+    th, td { border: 1px solid #cbd5e1; padding: 6px 10px; text-align: left; }
+    th { background: #f1f5f9; }
+  </style>
+</head>
+<body>
+  <div class="cover">
+    <div style="color:#2563eb; font-weight:700; font-size:10.5pt; text-transform:uppercase; letter-spacing:0.08em;">Educational Summary Guide</div>
+    <div class="title">{{ doc.video_title }}</div>
+    <div class="meta">Instructor / Channel: <strong>{{ doc.channel_name }}</strong></div>
+    <div class="meta" style="font-size:9pt; margin-top:6px;">Original Source: {{ doc.video_url }}</div>
+
+    {% if doc.video_id %}
+    <div class="thumb-wrapper">
+      <img src="https://img.youtube.com/vi/{{ doc.video_id }}/hqdefault.jpg" alt="Video Visual Reference">
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="page-break"></div>
+
+  <h2>1. Overview &amp; Learning Objectives</h2>
+  <p>{{ doc.introduction }}</p>
+  <ul>
+    {% for o in doc.learning_objectives %}
+      <li>{{ o }}</li>
+    {% endfor %}
+  </ul>
+
+  {% for s in doc.sections %}
+    <h2>{{ loop.index + 1 }}. {{ s.title }}</h2>
+    <p>{{ s.summary_markdown }}</p>
+
+    {% for d in s.definitions %}
+      <div class="box"><strong>{{ d.term }}:</strong> {{ d.definition }}</div>
+    {% endfor %}
+
+    {% if s.visual %}
+      <div class="visual">
+        {% if s.visual.is_generated_svg %}
+          {{ s.visual.svg_code | safe }}
+        {% else %}
+          <img src="{{ s.visual.image_url }}" alt="{{ s.visual.target_concept }}">
+        {% endif %}
+        <div class="caption">
+          Fig {{ loop.index }}: {{ s.visual.target_concept }} &mdash; <em>{{ s.visual.attribution }} ({{ s.visual.license }})</em>
+        </div>
+      </div>
+    {% endif %}
+
+    {% if s.formulas_or_steps %}
+      <div style="margin: 8px 0; font-size: 9.5pt;">
+        <strong>Core Steps / Formulas:</strong>
+        <ol style="margin-top: 4px;">
+          {% for step in s.formulas_or_steps %}
+            <li><code>{{ step }}</code></li>
+          {% endfor %}
+        </ol>
+      </div>
+    {% endif %}
+  {% endfor %}
+
+  <div class="page-break"></div>
+
+  <h2>Quick Revision &amp; Exam Notes</h2>
+  <div class="box" style="border-color:#10b981; background:#f0fdf4;">
+    <ul style="margin: 4px 0; padding-left: 20px;">
+      {% for r in doc.quick_revision %}
+        <li style="margin-bottom: 4px;">{{ r }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <h2>Diagrams &amp; Attribution Index</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Concept</th>
+        <th>Source</th>
+        <th>Attribution</th>
+        <th>License</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in doc.sections %}
+        {% if s.visual %}
+          <tr>
+            <td><strong>{{ s.visual.target_concept }}</strong></td>
+            <td>{{ s.visual.source_url[:35] }}</td>
+            <td>{{ s.visual.attribution }}</td>
+            <td>{{ s.visual.license }}</td>
+          </tr>
+        {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

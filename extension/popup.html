@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Video2Study PDF</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="brand"><span>Video2Study PDF</span></div>
+      <span class="badge">v1.0</span>
+    </header>
+    <div id="viewInactive" class="view hidden">
+      <p style="font-size:12px; color:#64748b; text-align:center;">Open an educational YouTube video to begin.</p>
+    </div>
+    <div id="viewActive" class="view">
+      <div class="video-card">
+        <div class="label">DETECTED VIDEO</div>
+        <div class="video-title" id="videoTitle">Detecting...</div>
+        <div class="video-meta" id="videoChannel">...</div>
+      </div>
+      <div class="checkbox-grid">
+        <label><input type="checkbox" id="optImages" checked> Visuals</label>
+        <label><input type="checkbox" id="optDiagrams" checked> Diagrams</label>
+        <label><input type="checkbox" id="optSources" checked> Credits</label>
+        <label><input type="checkbox" id="optTimestamps" checked> Timestamps</label>
+      </div>
+      <div style="margin-bottom: 12px;">
+        <label style="font-size:11px; font-weight:600;">Style:</label>
+        <div style="display:flex; gap:6px; margin-top:4px;">
+          <button class="style-card active" data-style="academic">Academic</button>
+          <button class="style-card" data-style="modern">Modern</button>
+          <button class="style-card" data-style="minimal">Minimal</button>
+        </div>
+      </div>
+      <button id="btnGenerate" class="primary-btn">Generate Study PDF</button>
+    </div>
+    <div id="viewProcessing" class="view hidden" style="text-align:center; padding:20px;">
+      <div class="spinner"></div>
+      <p id="stageStatus" style="font-size:12px; margin-top:10px;">Analyzing lecture...</p>
+    </div>
+    <div id="viewReady" class="view hidden" style="text-align:center; padding:15px;">
+      <h4 style="margin:0 0 6px;">PDF Ready</h4>
+      <p id="pdfStats" style="font-size:11px; color:#64748b;"></p>
+      <div style="display:flex; gap:8px; margin-top:12px;">
+        <button id="btnPreview" class="secondary-btn" style="flex:1;">Preview</button>
+        <button id="btnDownload" class="primary-btn" style="flex:1;">Download</button>
+      </div>
+      <button id="btnReset" class="text-btn">Process Another</button>
+    </div>
+    <div id="viewError" class="view hidden" style="padding:10px; background:#fee2e2; border-radius:4px;">
+      <strong id="errorHeading" style="font-size:12px; color:#991b1b;">Error</strong>
+      <p id="errorMessage" style="font-size:11px; color:#991b1b; margin:4px 0;"></p>
+      <button id="btnRetry" class="secondary-btn" style="width:100%; margin-top:8px;">Back</button>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
